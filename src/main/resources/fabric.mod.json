@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "moneytracker",
+  "version": "${version}",
+  "name": "Money Tracker",
+  "description": "Client-side mod that lets you mark a point in time and see how much money you've gained or lost since then. Made for Donut SMP.",
+  "authors": [
+    "you"
+  ],
+  "contact": {},
+  "license": "CC0-1.0",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.moneytracker.MoneyTrackerClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.18.1",
+    "minecraft": "~1.21.11",
+    "fabric-api": "*"
+  }
+}
