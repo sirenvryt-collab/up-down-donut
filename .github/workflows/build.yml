@@ -14,7 +14,7 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
       - name: Generate Gradle wrapper
-        run: gradle wrapper --gradle-version 8.14
+        run: gradle wrapper --gradle-version 9.6.1
       - name: Build
         run: ./gradlew build
       - name: Upload jar
