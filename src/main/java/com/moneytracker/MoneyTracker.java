@@ -29,6 +29,10 @@ public class MoneyTracker {
     public static volatile boolean hudEnabled = true;
     public static volatile String patternString = DEFAULT_PATTERN;
 
+    public static volatile boolean autoEnabled = false;
+    public static volatile int autoIntervalSeconds = 30;
+    public static volatile String autoCommand = ",bal";
+
     private static Pattern pattern = Pattern.compile(DEFAULT_PATTERN);
 
     private MoneyTracker() {
@@ -47,6 +51,13 @@ public class MoneyTracker {
                     if (data.patternString != null && !data.patternString.isEmpty()) {
                         setPattern(data.patternString);
                     }
+                    autoEnabled = data.autoEnabled;
+                    if (data.autoIntervalSeconds > 0) {
+                        autoIntervalSeconds = data.autoIntervalSeconds;
+                    }
+                    if (data.autoCommand != null && !data.autoCommand.isEmpty()) {
+                        autoCommand = data.autoCommand;
+                    }
                 }
             }
         } catch (Exception e) {
@@ -62,6 +73,9 @@ public class MoneyTracker {
             data.markedTimeMillis = markedTimeMillis;
             data.hudEnabled = hudEnabled;
             data.patternString = patternString;
+            data.autoEnabled = autoEnabled;
+            data.autoIntervalSeconds = autoIntervalSeconds;
+            data.autoCommand = autoCommand;
             Files.createDirectories(CONFIG_PATH.getParent());
             Files.writeString(CONFIG_PATH, GSON.toJson(data));
         } catch (IOException e) {
@@ -127,5 +141,8 @@ public class MoneyTracker {
         long markedTimeMillis;
         boolean hudEnabled = true;
         String patternString;
+        boolean autoEnabled = false;
+        int autoIntervalSeconds = 30;
+        String autoCommand = ",bal";
     }
 }
