@@ -159,7 +159,17 @@ public class MoneyTrackerClient implements ClientModInitializer {
         }
     }
 
-    private static String format(double value) {
+private static String format(double value) {
+        double abs = Math.abs(value);
+        if (abs >= 1_000_000_000_000.0) {
+            return String.format("%,.2fT", value / 1_000_000_000_000.0);
+        } else if (abs >= 1_000_000_000.0) {
+            return String.format("%,.2fB", value / 1_000_000_000.0);
+        } else if (abs >= 1_000_000.0) {
+            return String.format("%,.2fM", value / 1_000_000.0);
+        } else if (abs >= 1_000.0) {
+            return String.format("%,.2fK", value / 1_000.0);
+        }
         return String.format("%,.2f", value);
     }
 
