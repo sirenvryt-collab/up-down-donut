@@ -7,6 +7,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
@@ -17,6 +18,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
 public class MoneyTrackerClient implements ClientModInitializer {
+
+    private static int autoTickCounter = 0;
 
     @Override
     public void onInitializeClient() {
@@ -29,6 +32,19 @@ public class MoneyTrackerClient implements ClientModInitializer {
 
         ClientReceiveMessageEvents.CHAT.register((message, signedMessage, sender, params, receptionTimestamp) ->
                 MoneyTracker.onMessage(message.getString()));
+
+        // Periodically re-send the balance command on its own, if auto-check is enabled.
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            if (!MoneyTracker.autoEnabled) return;
+            if (client.player == null || client.getConnection() == null) return;
+
+            int intervalTicks = Math.max(MoneyTracker.autoIntervalSeconds, 5) * 20;
+            autoTickCounter++;
+            if (autoTickCounter >= intervalTicks) {
+                autoTickCounter = 0;
+                client.player.connection.sendChat(MoneyTracker.autoCommand);
+            }
+        });
 
         registerCommands();
         registerHud();
@@ -56,6 +72,17 @@ public class MoneyTrackerClient implements ClientModInitializer {
             dispatcher.register(ClientCommandManager.literal("moneypattern")
                     .then(ClientCommandManager.argument("regex", StringArgumentType.greedyString())
                             .executes(MoneyTrackerClient::executePattern)));
+
+            dispatcher.register(ClientCommandManager.literal("moneyauto")
+                    .executes(MoneyTrackerClient::executeAutoStatus)
+                    .then(ClientCommandManager.literal("off")
+                            .executes(MoneyTrackerClient::executeAutoOff))
+                    .then(ClientCommandManager.argument("seconds", com.mojang.brigadier.arguments.IntegerArgumentType.integer(5))
+                            .executes(MoneyTrackerClient::executeAutoOn)));
+
+            dispatcher.register(ClientCommandManager.literal("moneyautocmd")
+                    .then(ClientCommandManager.argument("text", StringArgumentType.greedyString())
+                            .executes(MoneyTrackerClient::executeAutoCommand)));
         });
     }
 
@@ -128,6 +155,44 @@ public class MoneyTrackerClient implements ClientModInitializer {
         return 1;
     }
 
+    private static int executeAutoStatus(CommandContext<FabricClientCommandSource> context) {
+        String status = MoneyTracker.autoEnabled
+                ? "ON, every " + MoneyTracker.autoIntervalSeconds + "s, sending \"" + MoneyTracker.autoCommand + "\""
+                : "OFF";
+        context.getSource().sendFeedback(Component.literal(
+                "[MoneyTracker] Auto-check is " + status +
+                        ". Use /moneyauto <seconds> or /moneyauto off."));
+        return 1;
+    }
+
+    private static int executeAutoOn(CommandContext<FabricClientCommandSource> context) {
+        int seconds = com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(context, "seconds");
+        MoneyTracker.autoIntervalSeconds = seconds;
+        MoneyTracker.autoEnabled = true;
+        autoTickCounter = 0;
+        MoneyTracker.save();
+        context.getSource().sendFeedback(Component.literal(
+                "[MoneyTracker] Auto-check enabled: sending \"" + MoneyTracker.autoCommand +
+                        "\" every " + seconds + "s."));
+        return 1;
+    }
+
+    private static int executeAutoOff(CommandContext<FabricClientCommandSource> context) {
+        MoneyTracker.autoEnabled = false;
+        MoneyTracker.save();
+        context.getSource().sendFeedback(Component.literal("[MoneyTracker] Auto-check disabled."));
+        return 1;
+    }
+
+    private static int executeAutoCommand(CommandContext<FabricClientCommandSource> context) {
+        String text = StringArgumentType.getString(context, "text");
+        MoneyTracker.autoCommand = text;
+        MoneyTracker.save();
+        context.getSource().sendFeedback(Component.literal(
+                "[MoneyTracker] Auto-check will now send: \"" + text + "\""));
+        return 1;
+    }
+
     private void registerHud() {
         HudElementRegistry.attachElementAfter(
                 VanillaHudElements.CHAT,
@@ -159,7 +224,7 @@ public class MoneyTrackerClient implements ClientModInitializer {
         }
     }
 
-private static String format(double value) {
+    private static String format(double value) {
         double abs = Math.abs(value);
         if (abs >= 1_000_000_000_000.0) {
             return String.format("%,.2fT", value / 1_000_000_000_000.0);
